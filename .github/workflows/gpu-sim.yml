@@ -10,6 +10,8 @@ name: gpu-sim
 # real GPU and does not replace them.
 
 on:
+  push:
+    branches: [verify-gpu-sim]
   workflow_dispatch:
   pull_request:
     branches: [main]
