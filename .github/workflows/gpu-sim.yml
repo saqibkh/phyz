@@ -11,7 +11,7 @@ name: gpu-sim
 
 on:
   push:
-    branches: [verify-gpu-sim]
+    branches: [verify-gpu-sim-cuda126]
   workflow_dispatch:
   pull_request:
     branches: [main]
@@ -23,7 +23,7 @@ on:
       - '.github/workflows/gpu-sim.yml'
 
 concurrency:
-  group: gpu-sim-${{ github.ref }}
+  group: gpu-sim-126-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -54,7 +54,7 @@ jobs:
         uses: pantheongpu/setup-pantheonsim@68edfd58c091361dd6baf060b63de412e544d858 # v0.1.7
         with:
           gpu: nvidia/h100
-          cuda-toolkit: "13.0"
+          cuda-toolkit: "12.6"
 
       - name: Build the test binaries
         run: cargo test -p phyz-gpu --features cuda,cuda-host --test cuda_vs_cpu --test train_parity --no-run
@@ -64,9 +64,15 @@ jobs:
       # return when no device or NVRTC is found, which would pass. Fail on
       # that, and unless the CUDA batch simulator started in both cuda_vs_cpu
       # tests and all five device tests passed.
+      - name: Driver and NVRTC versions under the simulator
+        run: |
+          export LD_LIBRARY_PATH="/usr/local/cuda-12.6/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          ls /usr/local | grep -i cuda || true
+          vgpu run python3 -c "import ctypes as c; d=c.CDLL('libcuda.so.1'); v=c.c_int(); d.cuInit(0); d.cuDriverGetVersion(c.byref(v)); n=c.CDLL('libnvrtc.so'); a=c.c_int(); b=c.c_int(); n.nvrtcVersion(c.byref(a),c.byref(b)); print('cuDriverGetVersion', v.value, 'nvrtcVersion', a.value, b.value)"
+
       - name: Run the CUDA device tests
         run: |
-          export LD_LIBRARY_PATH="/usr/local/cuda-13.0/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          export LD_LIBRARY_PATH="/usr/local/cuda-12.6/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
           set -o pipefail
           vgpu run cargo test -p phyz-gpu --features cuda,cuda-host \
             --test cuda_vs_cpu --test train_parity -- device:: --nocapture 2>&1 | tee gpu-tests.log
